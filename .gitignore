@@ -1,0 +1,30 @@
+# Compiled binaries, objects, and test executables
+*.o
+*.bin
+*.hex
+*.elf
+*.d
+test_runner
+
+# Arduino build output
+build/
+*.ino.hex
+*.ino.bin
+*.ino.elf
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# IDE and OS artifacts
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
