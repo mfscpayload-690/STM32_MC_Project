@@ -6,6 +6,11 @@
 *.d
 test_runner
 
+# Allow release firmware in bin/
+!bin/
+!bin/*.bin
+!bin/*.hex
+
 # Arduino build output
 build/
 *.ino.hex
