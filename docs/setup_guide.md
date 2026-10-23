@@ -40,10 +40,8 @@ The ST-Link V2 USB programmer requires a driver for your computer to recognize i
 
 ## 2. Hardware Wiring
 
-### Step 1: Connecting ST-Link V2 to STM32 Blue Pill
-Your ST-Link V2 has 10 pins on its output header. The Blue Pill has 4 pins at its bottom edge labeled `GND`, `CLK`, `IO`, `3V3`.
-
-Connect them using DuPont jumper cables as follows:
+### Step 1: Connecting ST-Link V2 to STM32 Blue Pill (SWD)
+Connect the 4 header pins at the bottom edge of the Blue Pill to the ST-Link V2 using DuPont jumper wires:
 
 | Blue Pill Pin Label | ST-Link V2 Pin | Description |
 | :---: | :---: | :--- |
@@ -57,17 +55,43 @@ Connect them using DuPont jumper cables as follows:
 
 ---
 
-### Step 2: Push Button & Resistor on Breadboard
-Connect the push button to pin **PA0** with a 10 kΩ pull-down resistor:
-1. Place the tactile push button across the center divider of your breadboard.
-2. Connect one terminal of the push button to the Blue Pill **3.3V** rail.
-3. Connect the other terminal of the button to Blue Pill **PA0**.
-4. Connect one leg of the **10 kΩ resistor** to **PA0** (same row as the button output).
-5. Connect the other leg of the **10 kΩ resistor** to the **GND** rail.
+### Step 2: Connecting the 0.96" I2C OLED Display (SSD1306)
+Connect the 4 pins of the OLED display to the Blue Pill:
+
+| OLED Pin | Blue Pill Pin | Description |
+| :---: | :---: | :--- |
+| **`GND`** | **`GND`** | Ground |
+| **`VCC`** | **`3.3V`** | 3.3V Power Rail |
+| **`SCL`** | **`PB6`** | Hardware I2C1 Clock Line |
+| **`SDA`** | **`PB7`** | Hardware I2C1 Data Line |
 
 ---
 
-### Step 3: Dual USB Cables Setup
+### Step 3: Connecting the KY-040 Rotary Encoder Module
+Connect the 5 pins of the KY-040 module to the Blue Pill:
+
+| KY-040 Pin | Blue Pill Pin | Description |
+| :---: | :---: | :--- |
+| **`GND`** | **`GND`** | Ground |
+| **`+` (VCC)** | **`3.3V`** | 3.3V Power Rail |
+| **`SW` (Button)** | **`PA0`** | Built-in push switch (Knob click) |
+| **`CLK` (A)** | **`PA1`** | Quadrature Clock signal |
+| **`DT` (B)** | **`PA2`** | Quadrature Data signal |
+
+---
+
+### Step 4: Connecting the Status LEDs
+Connect the two external 5mm LEDs on your breadboard:
+* **Green LED (Success / Typing):**
+  - Anode (Long leg) $\rightarrow$ Blue Pill pin **`PA8`**.
+  - Cathode (Short leg) $\rightarrow$ In series with a **220 Ω resistor** to **`GND`**.
+* **Red LED (Encrypting / Busy / Alert):**
+  - Anode (Long leg) $\rightarrow$ Blue Pill pin **`PA9`**.
+  - Cathode (Short leg) $\rightarrow$ In series with a **220 Ω resistor** to **`GND`**.
+
+---
+
+### Step 5: Dual USB Cables Setup
 For proper operation and testing:
 1. **ST-Link V2 USB:** Plugs into PC for programming and power.
 2. **Blue Pill Micro-B USB Cable:** Plugs from the Blue Pill's on-board Micro-USB port into a second USB port on your PC. This connection acts as the **USB HID Keyboard**!
