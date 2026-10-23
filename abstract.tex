@@ -1,0 +1,152 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[colorlinks=true,linkcolor=darkblue,urlcolor=darkblue,citecolor=darkblue]{hyperref}
+
+% Define custom color palette
+\definecolor{darkblue}{rgb}{0.08,0.18,0.36}
+
+% Header and footer configuration
+\pagestyle{fancy}
+\fancyhf{}
+\rfoot{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% Section and Subsection title formatting
+\titleformat{\section}{\large\bfseries\color{darkblue}}{}{0pt}{}[\vspace{0.1cm}]
+\titleformat{\subsection}{\normalsize\bfseries\color{darkblue}}{}{0pt}{}[\vspace{0.05cm}]
+
+% Set compact list spacing globally
+\setlist{noitemsep, topsep=2pt, parsep=1pt, partopsep=0pt}
+
+\begin{document}
+
+% ============================================
+% PAGE 1: COVER PAGE
+% ============================================
+
+\thispagestyle{empty}
+
+\begin{center}
+\vspace*{0.2cm}
+
+% Institution Details
+{\Large \textbf{APJ Abdul Kalam Technological University (KTU)}} \\[0.2cm]
+{\normalsize Kerala, India} \\[0.1cm]
+{\normalsize \textit{IHRD College of Engineering Kallooppara}} \\
+
+\vfill
+
+% Project Title Banner Box
+\colorbox{darkblue}{%
+  \parbox{0.92\textwidth}{%
+    \centering
+    \vspace{0.6cm}
+    {\LARGE \textbf{\textcolor{white}{Password Generator \& Auto-Filler}}} \\[0.2cm]
+    {\Large \textbf{\textcolor{white}{Secure Credential Management System}}} \\
+    \vspace{0.6cm}
+  }%
+}
+
+\vfill
+
+% Subtitle
+{\large \textit{A USB HID-Based Hardware Password Manager}} \\[0.15cm]
+{\normalsize using STM32 ARM Cortex-M3 Microcontroller} \\
+
+\vfill
+
+% Academic Details
+{\normalsize \textbf{Course:} Microcontrollers (PBCST504)} \\[0.1cm]
+{\normalsize \textbf{Semester:} S5 (B.Tech Computer Science \& Engineering)} \\
+
+\vfill
+
+% Team Details & Submission Grid
+\begin{table}[h!]
+\centering
+\begin{tabular}{p{0.45\textwidth} p{0.45\textwidth}}
+\textbf{\large Project Team Members:} & \textbf{\large Submission Details:} \\[0.2cm]
+$\bullet$ Aravind Lal (Roll No: 13) & \textbf{Submitted To:} \\[0.1cm]
+$\bullet$ Betsa Mariya Philip (Roll No: 18) & \dots\dots\dots\dots\dots\dots\dots\dots\dots \\[0.2cm]
+$\bullet$ Karthik V Panicker (Roll No: 29) & \textbf{Submission Date:} \\[0.1cm]
+$\bullet$ Vaishnav Prasad A (Roll No: 57) & August 6, 2026 \\
+\end{tabular}
+\end{table}
+
+\vfill
+
+% Footer
+{\footnotesize Department of Computer Science \& Engineering} \\
+{\footnotesize All rights reserved \copyright~2026}
+
+\end{center}
+
+% ============================================
+% PAGE BREAK
+% ============================================
+
+\newpage
+
+% ============================================
+% PAGE 2: PROJECT ABSTRACT
+% ============================================
+
+\pagestyle{fancy}
+\setcounter{page}{1}
+
+\vspace*{-0.3cm}
+
+\section*{\centering PROJECT ABSTRACT}
+\rule{\textwidth}{0.8pt}
+
+\vspace{0.3cm}
+
+\subsection*{1. Objective}
+To design and implement a plug-and-play USB hardware password manager using the STM32 Blue Pill microcontroller. The system generates high-entropy random passwords, encrypts them locally using AES-128, stores them in internal flash memory, and automatically inputs them into host login fields via USB HID keyboard emulation, protecting credentials from OS-level keyloggers.
+
+\vspace{0.3cm}
+
+\subsection*{2. System Description}
+This project implements an air-gapped hardware device based on the STM32F103C8T6 (ARM Cortex-M3) development board. Upon pressing a push button connected to GPIO PA0, the firmware executes a pseudo-random number generator (PRNG) seeded with hardware entropy (SysTick timer counter, floating ADC channel noise, and chip Unique Device ID) to generate a 12--16 character password (uppercase, lowercase, numbers, special symbols). The generated password is immediately encrypted using AES-128 and stored in dedicated STM32 internal flash memory. Concurrently, the decrypted password is sent over USB HID keyboard protocol to auto-fill the active credential field on any host PC without requiring host software or drivers.
+
+\vspace{0.3cm}
+
+\subsection*{3. Technical & Component Specifications}
+\begin{itemize}
+    \item \textbf{Microcontroller Board:} STM32F103C8T6 Blue Pill (ARM Cortex-M3, 72\,MHz, 64\,KB Flash, 20\,KB SRAM)
+    \item \textbf{Programming Interface:} ST-Link V2 In-Circuit Debugger/Programmer over 4-pin SWD interface
+    \item \textbf{Hardware Peripherals:} PA0 Push Button (trigger), $10\,\text{k}\Omega$ pull-down resistor, USB Micro-B data cable, breadboard
+    \item \textbf{Software Toolchain:} Arduino IDE with STM32 Core (\texttt{STM32duino}), ST-Link Drivers, Embedded C/C++
+    \item \textbf{Cryptography & Protocol:} AES-128 encryption (NIST FIPS 197 compliant), USB 2.0 Full-Speed HID Keyboard Class
+\end{itemize}
+
+\vspace{0.3cm}
+
+\subsection*{4. Key Features & Security Benefits}
+\begin{itemize}
+    \item \textbf{High-Entropy Generation:} Enforces strong 12--16 character mixed passwords, ending reliance on weak or reused passwords.
+    \item \textbf{Hardware Anti-Keylogger Protection:} Transmits scan codes directly via USB HID endpoints, insulating credentials from host malware and clipboard monitors.
+    \item \textbf{AES-128 Flash Security:} Protects data at rest in internal flash memory against unauthorized physical extraction.
+    \item \textbf{Universal Plug-and-Play:} Operates driverless across Windows, macOS, Linux, and Android.
+\end{itemize}
+
+\vspace{0.3cm}
+
+\subsection*{5. Conclusion}
+The project delivers a secure, low-cost hardware token combining embedded systems programming, cryptographic storage, and USB protocol emulation to solve critical password security vulnerabilities.
+
+\vspace{0.5cm}
+
+\noindent
+\textbf{Keywords:} STM32 Blue Pill, USB HID, AES-128 Encryption, Embedded Security, Hardware Password Manager, Anti-Keylogger.
+
+\end{document}
