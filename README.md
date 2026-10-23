@@ -29,53 +29,85 @@ When you press the physical button on the device:
 
 ---
 
-## 🛠️ Required Hardware
+## 🛠️ Required Hardware Components
 
-| Component | Quantity | Purpose |
-| :--- | :---: | :--- |
-| **STM32 Blue Pill Board** | 1 | Microcontroller (STM32F103C8T6, 72 MHz, 64 KB Flash) |
-| **ST-Link V2 Programmer** | 1 | SWD In-Circuit Debugger & Firmware Flasher |
-| **Breadboard** | 1 | Circuit prototyping |
-| **Momentary Push Button** | 1 | Trigger button for password generation/filling |
-| **10 kΩ Resistor** | 1 | Pull-down resistor for button (PA0) |
-| **USB Micro-B Cable** | 1 | USB data connection between Blue Pill and PC |
-| **DuPont Jumper Wires** | Several | Interconnections (SWD & breadboard) |
+| Component | Specifications | Quantity | Purpose |
+| :--- | :--- | :---: | :--- |
+| **STM32 Blue Pill** | STM32F103C8T6 (ARM Cortex-M3, 72 MHz) | 1 pc | Core microcontroller unit |
+| **ST-Link V2** | SWD In-Circuit Debugger / Programmer | 1 pc | Firmware flashing & debugging |
+| **OLED Display** | 0.96" 128×64 I2C Module (SSD1306) | 1 pc | Real-time UI, status, & password view |
+| **Rotary Encoder** | KY-040 Quadrature Encoder + Push Switch | 1 pc | Interactive menu navigation & selection |
+| **Status LEDs** | 5mm Standard Green (1 pc), Red (1 pc) | 2 pcs | Success/Typing (Green), Busy/Encrypting (Red) |
+| **Resistors** | 220 Ω (for LEDs), 10 kΩ pull-ups | 4 pcs | Current limiting & GPIO pull-ups |
+| **Breadboard & Wires** | Solderless 830-pt + DuPont Jumpers (M-M, M-F) | 1 set | Prototyping interconnections |
+| **USB Micro-B Cable** | High-speed data cable | 1 pc | USB HID Keyboard connection to PC |
 
 ---
 
 ## 🔌 Hardware Wiring & Pinout
 
-### 1. ST-Link V2 to STM32 Blue Pill (SWD 4-Wire Interface)
-Connect the 4 header pins at the bottom edge of the Blue Pill to the ST-Link V2:
-
-| STM32 Blue Pill Pin | ST-Link V2 Pin | Wire Color (Standard) | Description |
-| :---: | :---: | :---: | :--- |
-| **`3V3`** | **`3.3V`** (Pin 7 or 8) | Red | 3.3V Logic & Power |
-| **`SWDIO`** | **`SWDIO`** (Pin 4) | Yellow | Serial Wire Data Input/Output |
-| **`SWCLK`** | **`SWCLK`** (Pin 2) | Green | Serial Wire Clock |
-| **`GND`** | **`GND`** (Pin 5 or 6) | Blue / Black | Ground |
-
-> [!IMPORTANT]
-> Always power the Blue Pill using **3.3V** from ST-Link, **NEVER 5V** onto the 3V3 pin!
+### 1. ST-Link V2 to STM32 Blue Pill (4-Wire SWD)
+| STM32 Blue Pill Pin | ST-Link V2 Pin | Description |
+| :---: | :---: | :--- |
+| **`3V3`** | **`3.3V`** (Pin 7 or 8) | 3.3V Power Supply (Never connect 5V to 3V3!) |
+| **`SWIO`** | **`SWDIO`** (Pin 4) | Serial Wire Debug Data Line |
+| **`SWCLK`** | **`SWCLK`** (Pin 2) | Serial Wire Debug Clock Line |
+| **`GND`** | **`GND`** (Pin 5 or 6) | Common Ground |
 
 ---
 
-### 2. Breadboard Button Circuit (PA0)
-Connect the push button to pin **PA0** with a pull-down resistor:
+### 2. 0.96" I2C OLED Display (SSD1306)
+| OLED Pin | STM32 Blue Pill Pin | Description |
+| :---: | :---: | :--- |
+| **`GND`** | **`GND`** | Ground |
+| **`VCC`** | **`3.3V`** | 3.3V Power |
+| **`SCL`** | **`PB6`** | Hardware I2C1 Clock |
+| **`SDA`** | **`PB7`** | Hardware I2C1 Data |
+
+---
+
+### 3. KY-040 Rotary Encoder Module
+| KY-040 Pin | STM32 Blue Pill Pin | Description |
+| :---: | :---: | :--- |
+| **`GND`** | **`GND`** | Ground |
+| **`+` (VCC)** | **`3.3V`** | 3.3V Power |
+| **`SW` (Button)** | **`PA0`** | Built-in push switch (Click knob) |
+| **`CLK` (A)** | **`PA1`** | Quadrature Clock output |
+| **`DT` (B)** | **`PA2`** | Quadrature Data output |
+
+---
+
+### 4. Status LEDs (with 220 Ω Resistors)
+| LED | STM32 Pin | Series Resistor | Function |
+| :---: | :---: | :---: | :--- |
+| **Green LED** | **`PA8`** | 220 Ω to GND | Lights up on successful USB typing / ready |
+| **Red LED** | **`PA9`** | 220 Ω to GND | Lights up during AES encryption & flash write |
+| **Onboard LED** | **`PC13`** | Internal | Activity heartbeat (Active LOW) |
+
+---
+
+## 🕹️ Interactive Menu Navigation
+
+The 128×64 OLED screen displays a clean menu operated entirely with the rotary encoder:
+* **Rotate Knob (CW / CCW):** Scroll through menu items or adjust values.
+* **Click Knob (`SW`):** Select menu item / Confirm action.
+
+```text
++------------------------+
+|  === KEYPILL v1.0 ===  |
+| > 1. AutoFill New      |
+|   2. AutoFill Saved    |
+|   3. View Password     |
+|   4. Set Length: 14    |
+|   5. System Info       |
++------------------------+
 ```
-           +3.3V
-             |
-           [Button]
-             |
- PA0 --------+
-             |
-          [10kΩ]
-             |
-            GND
-```
-- One side of the button goes to **3.3V**.
-- The other side connects to **PA0** AND to one leg of the **10kΩ resistor**.
-- The second leg of the **10kΩ resistor** connects to **GND**.
+
+1. **AutoFill New:** Generates strong random password, encrypts via AES-128, saves to flash, types to host PC via USB HID, and presses `ENTER`.
+2. **AutoFill Saved:** Decrypts existing password from Flash and types into PC.
+3. **View Password:** Displays decrypted password on OLED for 6 seconds with a live countdown progress bar, then clears it securely.
+4. **Set Length:** Rotate knob to configure password length (12, 14, or 16 characters).
+5. **System Info:** Displays MCU clock (72MHz), crypto standard, Flash page, and USB status.
 
 ---
 
