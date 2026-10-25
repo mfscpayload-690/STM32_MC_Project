@@ -9,7 +9,7 @@
  *
  * HARDWARE PERIPHERALS:
  * 1. OLED Display: 0.96" 128x64 I2C (SSD1306) on PB6 (SCL) and PB7 (SDA)
- * 2. Rotary Encoder: KY-040 Module on PA1 (CLK), PA2 (DT), PA0 (SW Push Switch)
+ * 2. Rotary Encoder: EC11 Module on PA1 (S1/CLK), PA2 (S2/DT), PA0 (Key/SW Push Switch)
  * 3. Status LEDs:
  *    - Green LED on PA8 (Operation Success / Ready / Typing)
  *    - Red LED on PA9 (Busy / Cryptographic Operation / Error)
@@ -30,6 +30,9 @@
  * ==============================================================================
  */
 
+#ifndef GCC_VERSION
+#define GCC_VERSION 140201
+#endif
 #include <Arduino.h>
 #include <Keyboard.h>
 #include "aes128.h"
@@ -41,9 +44,9 @@
 // ------------------------------------------------------------------------------
 // Hardware Pin Assignments
 // ------------------------------------------------------------------------------
-#define PIN_ENCODER_SW   PA0   // KY-040 Push Switch (active LOW with internal pull-up)
-#define PIN_ENCODER_CLK  PA1   // KY-040 Rotary Clock
-#define PIN_ENCODER_DT   PA2   // KY-040 Rotary Data
+#define PIN_ENCODER_SW   PA0   // EC11 Key / Push Switch (active LOW with internal pull-up)
+#define PIN_ENCODER_CLK  PA1   // EC11 S1 (Quadrature Clock / Phase A)
+#define PIN_ENCODER_DT   PA2   // EC11 S2 (Quadrature Data / Phase B)
 #define PIN_ENTROPY_ADC  PA3   // Unconnected floating analog pin for RF/thermal noise
 
 #define PIN_LED_GREEN    PA8   // External Green LED (Success / USB Typing)
@@ -114,13 +117,6 @@ void secure_zero_memory(void *v, size_t n) {
     }
 }
 
-void trigger_usb_reenumeration(void) {
-    pinMode(PA12, OUTPUT);
-    digitalWrite(PA12, LOW); // Force D+ low (disconnect)
-    delay(150);
-    pinMode(PA12, INPUT);   // Release D+ (re-attach)
-    delay(150);
-}
 
 // ------------------------------------------------------------------------------
 // OLED Renderers
@@ -445,7 +441,13 @@ void setup() {
     pinMode(PIN_STATUS_LED, OUTPUT);
     pinMode(PIN_ENTROPY_ADC, INPUT_ANALOG);
 
+    // Hardware Power-on Self-Test: flash all LEDs for 350ms so user verifies LEDs and power
+    digitalWrite(PIN_LED_GREEN, HIGH);
+    digitalWrite(PIN_LED_RED, HIGH);
+    digitalWrite(PIN_STATUS_LED, LOW); // Onboard PC13 active LOW (ON)
+    delay(350);
     set_leds(false, false);
+    delay(100);
 
     // Storage and Rotary Encoder initialization
     storage_init();
@@ -453,9 +455,12 @@ void setup() {
 
     // OLED Display initialization over I2C (PB6 = SCL, PB7 = SDA)
     g_oled_available = OLED.begin(OLED_I2C_ADDR);
+    if (!g_oled_available) {
+        // Fallback for OLED modules wired at 0x3D
+        g_oled_available = OLED.begin(0x3D);
+    }
 
-    // USB Re-enumeration on PA12 to ensure host PC detects keyboard
-    trigger_usb_reenumeration();
+    // Initialize USB HID Keyboard peripheral
     Keyboard.begin();
 
     // Welcome Splash Screen on OLED
@@ -478,6 +483,13 @@ void setup() {
 }
 
 void loop() {
+    // Active heartbeat: toggle onboard PC13 LED every 500ms so user knows loop is running
+    static uint32_t last_heartbeat = 0;
+    if (millis() - last_heartbeat >= 500) {
+        last_heartbeat = millis();
+        digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED));
+    }
+
     // Read Rotary Encoder knob movements
     encoder.update();
 
