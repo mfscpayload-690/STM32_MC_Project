@@ -17,12 +17,13 @@ The ST-Link V2 USB programmer requires a driver for your computer to recognize i
   2. Extract the zip file and run `dpinst_amd64.exe` (or `dpinst_x86.exe` on 32-bit systems).
   3. When plugged in, the ST-Link V2 will show up in Device Manager under **Universal Serial Bus devices** as *STMicroelectronics STLink dongle*.
 - **Linux:**
-  - Run: `sudo apt install stlink-tools` (Debian/Ubuntu) or `sudo pacman -S stlink` (Arch).
-  - Add udev rules if necessary for non-root access:
+  - Copy the bundled OpenOCD udev rules for ST-Link access:
     ```bash
-    sudo cp /usr/lib/udev/rules.d/49-stlink* /etc/udev/rules.d/
+    sudo cp ~/.arduino15/packages/STMicroelectronics/tools/xpack-openocd/0.12.0-6/openocd/contrib/60-openocd.rules /etc/udev/rules.d/
     sudo udevadm control --reload-rules
+    sudo udevadm trigger
     ```
+  - Unplug and replug the ST-Link V2 USB dongle.
 
 ### Step 3: Add STM32 Core to Arduino IDE
 1. Open Arduino IDE.
@@ -67,16 +68,19 @@ Connect the 4 pins of the OLED display to the Blue Pill:
 
 ---
 
-### Step 3: Connecting the KY-040 Rotary Encoder Module
-Connect the 5 pins of the KY-040 module to the Blue Pill:
+### Step 3: Connecting the EC11 Rotary Encoder Module (Circular 4/5-Pin Module)
+The circular EC11 module provides quadrature signals (`S1`, `S2`), an integrated push button (`Key`), and power rails:
 
-| KY-040 Pin | Blue Pill Pin | Description |
+| EC11 Pin Label | Blue Pill Pin | Description / Function |
 | :---: | :---: | :--- |
 | **`GND`** | **`GND`** | Ground |
-| **`+` (VCC)** | **`3.3V`** | 3.3V Power Rail |
-| **`SW` (Button)** | **`PA0`** | Built-in push switch (Knob click) |
-| **`CLK` (A)** | **`PA1`** | Quadrature Clock signal |
-| **`DT` (B)** | **`PA2`** | Quadrature Data signal |
+| **`S1`** | **`PA1`** | Quadrature Clock / Phase A (`CLK`) |
+| **`S2`** | **`PA2`** | Quadrature Data / Phase B (`DT`) |
+| **`Key`** | **`PA0`** | Built-in push switch (Knob click / `SW`) |
+| **`5V`** *(Optional)* | **`3.3V`** *(or leave unconnected)* | Power rail for on-board SMD pull-up resistors |
+
+> [!TIP]
+> **4-Wire Connection (Recommended):** The STM32 Blue Pill firmware enables internal pull-ups (`INPUT_PULLUP`) on pins `PA0`, `PA1`, and `PA2`. You only need to wire **4 pins**: **`GND`**, **`S1`**, **`S2`**, and **`Key`**. The **`5V`** pin can remain unconnected. If you choose to connect the `5V` pin, connect it to the Blue Pill's **3.3V** pin (do not connect to 5V).
 
 ---
 
@@ -91,7 +95,12 @@ Connect the two external 5mm LEDs on your breadboard:
 
 ---
 
-### Step 5: Dual USB Cables Setup
+### Step 5: Physical Entropy Harvesting Pin
+Leave pin **`PA3`** unconnected (floating) on the breadboard. It acts as an antenna capturing ambient electromagnetic and thermal noise through the internal ADC, seeding the PRNG with physical randomness.
+
+---
+
+### Step 6: Dual USB Cables Setup
 For proper operation and testing:
 1. **ST-Link V2 USB:** Plugs into PC for programming and power.
 2. **Blue Pill Micro-B USB Cable:** Plugs from the Blue Pill's on-board Micro-USB port into a second USB port on your PC. This connection acts as the **USB HID Keyboard**!
@@ -123,22 +132,28 @@ Open `KeyPill/KeyPill.ino` in Arduino IDE. Under the **Tools** menu, configure:
    Time elapsed...
    GO ...
    ```
-5. The onboard green/red LED on the Blue Pill will flash 3 times, signaling ready state.
+5. The device displays a startup splash screen on the OLED: `"KEYPILL - Hardware Password Token - STM32 + AES-128"`.
 
 ---
 
 ## 5. Live Demonstration & Verification
 
-1. Open a blank text editor like **Notepad** (Windows), **TextEdit** (macOS), or a terminal/browser login box.
-2. Place the typing cursor into the editor.
-3. **Short Press** the push button on PA0:
-   - Status LED turns ON.
-   - Microcontroller generates 14-character high-entropy password.
-   - Encrypts via AES-128 and stores to internal flash.
-   - Types out the password into your editor and automatically presses `ENTER`!
-   - LED blinks twice to confirm successful execution.
-4. **Long Press** the button (> 2 seconds):
-   - The device retrieves and re-types your saved password from flash memory without generating a new one.
+1. Open a blank text editor like **Notepad** (Windows), **TextEdit** (macOS), or a browser login box.
+2. Place the typing cursor into the password field.
+3. Observe the 128×64 OLED screen displaying the 5-item main menu:
+   - `> 1. AutoFill New`
+   - `  2. AutoFill Saved`
+   - `  3. View Password`
+   - `  4. Set Length: 14`
+   - `  5. System Info`
+4. **Rotate the Rotary Knob (CW / CCW):**
+   - The selection cursor moves dynamically between the 5 menu items.
+5. **Click the Rotary Knob (SW on PA0):**
+   - **`1. AutoFill New`:** Microcontroller gathers entropy, generates a fresh random password, encrypts it with AES-128, saves it into internal flash, types it into your PC, and presses `ENTER`. Status LEDs and OLED reflect real-time progress.
+   - **`2. AutoFill Saved`:** Decrypts the existing password from flash and types it directly into the PC + `ENTER`.
+   - **`3. View Password`:** Shows the stored password on the OLED with a live 6-second auto-clearing progress bar for secure visual inspection.
+   - **`4. Set Length`:** Rotate knob to adjust password length (12, 14, or 16 characters) and click to save.
+   - **`5. System Info`:** Displays microcontroller frequency (72 MHz), NIST crypto mode, flash page, and USB HID status.
 
 ---
 
