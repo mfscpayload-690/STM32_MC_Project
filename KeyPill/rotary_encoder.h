@@ -1,6 +1,6 @@
 /**
  * @file rotary_encoder.h
- * @brief KY-040 Rotary Encoder Driver with Quadrature Decoding & Debounce
+ * @brief EC11 / KY-040 Rotary Encoder Driver with Quadrature Decoding & Debounce
  */
 
 #ifndef ROTARY_ENCODER_H
