@@ -16,6 +16,9 @@ build/
 *.ino.hex
 *.ino.bin
 *.ino.elf
+compile_commands.json
+.clangd
+.clangd/
 
 # LaTeX auxiliary files
 *.aux
