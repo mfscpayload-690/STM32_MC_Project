@@ -7,6 +7,9 @@
 #include <string.h>
 
 #if defined(ARDUINO)
+#ifndef GCC_VERSION
+#define GCC_VERSION 140201
+#endif
 #include <Arduino.h>
 #include <EEPROM.h>
 #else
