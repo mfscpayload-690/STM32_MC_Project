@@ -2,23 +2,26 @@
 
 ## 1. System Architecture
 
-The KeyPill architecture consists of four decoupled firmware modules executing on the ARM Cortex-M3 core:
+The KeyPill architecture consists of decoupled firmware modules executing on the ARM Cortex-M3 core:
 
 ```
 +-------------------------------------------------------------------------+
-|                              USER TRIGGER                               |
-|                  (Physical Push Button on GPIO PA0)                     |
+|                  USER INTERFACE & NAVIGATION SUBSYSTEM                  |
+|  - EC11 Quadrature Rotary Encoder (PA1 S1/CLK, PA2 S2/DT)               |
+|  - Push Key Selection Button (PA0 Key/SW, Active LOW, Internal Pull-Up)  |
+|  - 0.96" 128x64 SSD1306 OLED Display (PB6 SCL, PB7 SDA @ 400kHz I2C)    |
+|  - Visual Indicators: Green (PA8 Typing), Red (PA9 Busy), Heartbeat PC13|
 +------------------------------------+------------------------------------+
-                                     |
+                                     | Interactive Menu Selection
                                      v
 +-------------------------------------------------------------------------+
 |                        ENTROPY HARVESTING & PRNG                        |
-|  - SysTick microsecond counter (VAL)                                    |
-|  - Floating ADC noise (PA1)                                             |
-|  - STM32 96-bit factory Unique Device ID (0x1FFFF7E8)                   |
+|  - SysTick microsecond counter (VAL jitter on user click)               |
+|  - Floating ADC noise channel (PA3 thermal/RF voltage noise)            |
+|  - STM32 96-bit factory Unique Device ID (0x1FFFF7E8 register)          |
 |  - Xorshift128+ state engine -> Fisher-Yates character distribution     |
 +------------------------------------+------------------------------------+
-                                     | Plaintext Password (14 chars)
+                                     | Plaintext Password (12, 14, or 16 chars)
                                      v
 +-------------------------------------------------------------------------+
 |                         AES-128 CRYPTO ENGINE                           |
@@ -30,16 +33,22 @@ The KeyPill architecture consists of four decoupled firmware modules executing o
                                      v
 +------------------------------------+------------------------------------+
 |                       INTERNAL FLASH STORAGE                            |
-|  - Page 63 (0x0800FC00 - 0x0800FFFF) of STM32F103 Flash                 |
-|  - Record header: Magic (0x4B50494C), Lengths, Checksum                 |
+|  - STM32 Emulated EEPROM (Top Flash Page, e.g. Page 63 @ 0x0800FC00)    |
+|  - Record header: Magic (0x4B50494C), Lengths, Checksum (44 bytes total)|
 +------------------------------------+------------------------------------+
-                                     | Decrypted Plaintext
+                                     | Plaintext Typed
                                      v
 +-------------------------------------------------------------------------+
 |                       USB HID KEYBOARD SUBSYSTEM                        |
-|  - USB 2.0 Full Speed (12 Mbps)                                         |
-|  - HID Class Report Protocol (0x01)                                     |
-|  - Keystroke translation + 12ms human debounce typing delay             |
+|  - USB 2.0 Full Speed (12 Mbps) Device Controller                       |
+|  - HID Class Report Protocol (0x01) with hardware scan codes            |
+|  - Inter-keystroke debounce delay (12ms) + automatic RETURN keystroke   |
++------------------------------------+------------------------------------+
+                                     | SRAM Scrubbing
+                                     v
++-------------------------------------------------------------------------+
+|                        SECURE MEMORY PURGE                              |
+|  - Volatile zeroing of plaintext password buffers & decrypted structures|
 +-------------------------------------------------------------------------+
 ```
 
@@ -53,6 +62,8 @@ The KeyPill architecture consists of four decoupled firmware modules executing o
 - **Flash Memory:** 64 KB (organized into 64 pages of 1 KB each)
 - **SRAM:** 20 KB
 - **Operating Voltage:** 3.3V DC (onboard regulator accepts 5V from USB)
+- **Display Module:** 0.96" SSD1306 monochrome 128×64 OLED over hardware I2C1 (PB6/PB7)
+- **Navigation Module:** EC11 rotary quadrature encoder module with integrated tactile push key
 - **USB Peripheral:** USB 2.0 Full Speed (12 Mbit/s) Device Controller with shared 512-byte packet buffer
 
 ---
@@ -81,30 +92,31 @@ For a password of length $L$ bytes:
 True randomness on microcontrollers without dedicated hardware TRNG is synthesized through multi-source physical entropy:
 
 1. **SysTick Counter (`SysTick->VAL`):** Counts down from 71999 at 72 MHz. Microsecond variations in user human button press timing introduce several bits of high-frequency jitter.
-2. **Analog ADC Noise (`PA1`):** Floating ADC input channel measures ambient electromagnetic interference and thermal voltage fluctuations.
+2. **Analog ADC Noise (`PA3`):** Floating ADC input channel measures ambient electromagnetic interference and thermal voltage fluctuations.
 3. **Silicon Factory Unique ID:** Every STM32 chip contains a factory-programmed 96-bit unique serial number stored at memory address `0x1FFFF7E8` (3 words: `UID[0]`, `UID[1]`, `UID[2]`).
 
 ### PRNG Algorithm: Xorshift128+
 - State size: 128 bits (`uint64_t s[2]`).
 - Period: $2^{128} - 1$.
 - Extremely fast on ARM Cortex-M3 (bitwise shifts and XOR operations).
-- Shuffling via **Fisher-Yates** algorithm eliminates selection bias and guarantees uniform distribution.
+- Shuffling via **Fisher-Yates** algorithm eliminates selection bias and guarantees uniform distribution across character categories (uppercase, lowercase, digits, symbols).
 
 ---
 
 ## 5. Non-Volatile Storage Layout
 
-Encrypted passwords are saved in the top flash page of the STM32F103C8 (Page 63, `0x0800FC00`):
+Encrypted passwords are saved in the top flash page of the STM32F103 (Page 63, `0x0800FC00` on 64KB chips) via the STM32duino Flash-emulated EEPROM subsystem:
 
 | Offset | Field | Size | Description |
 | :---: | :--- | :---: | :--- |
 | `0x00` | `magic` | 4 bytes | Magic identifier: `0x4B50494C` ("KPIL") |
-| `0x04` | `password_len` | 1 byte | Plaintext password length (e.g. 14) |
+| `0x04` | `password_len` | 1 byte | Plaintext password length (12, 14, or 16) |
 | `0x05` | `encrypted_len` | 1 byte | Ciphertext length (16 or 32 bytes) |
 | `0x06` | `encrypted_data` | 32 bytes | AES-128 ciphertext payload |
-| `0x26` | `checksum` | 4 bytes | Additive polynomial checksum |
+| `0x26` | *(padding)* | 2 bytes | Compiler boundary alignment to 32-bit word |
+| `0x28` | `checksum` | 4 bytes | Additive polynomial checksum |
 
-**Total Record Size:** 42 bytes.
+**Total Record Size:** 44 bytes.
 
 ---
 
