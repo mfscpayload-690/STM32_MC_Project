@@ -19,7 +19,7 @@ extern "C" {
 
 /**
  * @brief Initialize the PRNG with hardware entropy (SysTick, Floating ADC, STM32 UID).
- * @param adc_noise_value Value read from floating ADC pin (e.g. analogRead(PA1)).
+ * @param adc_noise_value Value read from floating ADC pin (e.g. analogRead(PA3)).
  * @param time_us Current microsecond timestamp (micros()).
  * @param cycle_count Current SysTick value.
  */
