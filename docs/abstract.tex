@@ -60,6 +60,7 @@
 
 % Subtitle
 {\large \textit{A USB HID-Based Hardware Password Manager}} \\[0.15cm]
+{\normalsize with Interactive OLED UI \& Rotary Encoder Navigation} \\[0.1cm]
 {\normalsize using STM32 ARM Cortex-M3 Microcontroller} \\
 
 \vfill
@@ -111,12 +112,12 @@ $\bullet$ Vaishnav Prasad A (Roll No: 57) & August 6, 2026 \\
 \vspace{0.3cm}
 
 \subsection*{1. Objective}
-To design and implement a plug-and-play USB hardware password manager using the STM32 Blue Pill microcontroller. The system generates high-entropy random passwords, encrypts them locally using AES-128, stores them in internal flash memory, and automatically inputs them into host login fields via USB HID keyboard emulation, protecting credentials from OS-level keyloggers.
+To design and implement a plug-and-play USB hardware password manager using the STM32 Blue Pill microcontroller. The system generates high-entropy random passwords, encrypts them locally using AES-128, stores them in internal flash memory, and automatically inputs them into host login fields via USB HID keyboard emulation, protecting credentials from OS-level keyloggers while offering an intuitive standalone visual interface.
 
 \vspace{0.3cm}
 
 \subsection*{2. System Description}
-This project implements an air-gapped hardware device based on the STM32F103C8T6 (ARM Cortex-M3) development board. Upon pressing a push button connected to GPIO PA0, the firmware executes a pseudo-random number generator (PRNG) seeded with hardware entropy (SysTick timer counter, floating ADC channel noise, and chip Unique Device ID) to generate a 12--16 character password (uppercase, lowercase, numbers, special symbols). The generated password is immediately encrypted using AES-128 and stored in dedicated STM32 internal flash memory. Concurrently, the decrypted password is sent over USB HID keyboard protocol to auto-fill the active credential field on any host PC without requiring host software or drivers.
+This project implements an air-gapped hardware credential token based on the STM32F103C8T6 (ARM Cortex-M3) development board, interfaced with a 0.96-inch 128$\times$64 I2C OLED display (SSD1306) and an EC11 rotary quadrature encoder. Operating via a 5-function interactive on-screen menu, the firmware executes a pseudo-random number generator (PRNG) seeded with physical hardware entropy (microsecond SysTick timer counter jitter, floating ADC noise on pin PA3, and the factory-programmed 96-bit Unique Device ID) to generate strong 12--16 character passwords across four character classes. Credentials are immediately encrypted using NIST FIPS 197 compliant AES-128 and saved into internal flash memory. Concurrently, the decrypted password is sent over the USB HID keyboard protocol to auto-fill the active credential field on any host PC without host-side software. The device also supports on-screen credential inspection with an auto-scrubbing countdown timer.
 
 \vspace{0.3cm}
 
@@ -124,9 +125,10 @@ This project implements an air-gapped hardware device based on the STM32F103C8T6
 \begin{itemize}
     \item \textbf{Microcontroller Board:} STM32F103C8T6 Blue Pill (ARM Cortex-M3, 72\,MHz, 64\,KB Flash, 20\,KB SRAM)
     \item \textbf{Programming Interface:} ST-Link V2 In-Circuit Debugger/Programmer over 4-pin SWD interface
-    \item \textbf{Hardware Peripherals:} PA0 Push Button (trigger), $10\,\text{k}\Omega$ pull-down resistor, USB Micro-B data cable, breadboard
+    \item \textbf{Display & Navigation:} 0.96'' 128$\times$64 I2C OLED Display (SSD1306, PB6/PB7) and EC11 Rotary Encoder with push button (PA1/PA2/PA0)
+    \item \textbf{Hardware Peripherals:} Floating ADC noise pin (PA3), status LEDs (PA8 Green, PA9 Red, PC13 Heartbeat), USB Micro-B cable, breadboard
     \item \textbf{Software Toolchain:} Arduino IDE with STM32 Core (\texttt{STM32duino}), ST-Link Drivers, Embedded C/C++
-    \item \textbf{Cryptography & Protocol:} AES-128 encryption (NIST FIPS 197 compliant), USB 2.0 Full-Speed HID Keyboard Class
+    \item \textbf{Cryptography & Protocol:} AES-128 encryption (NIST FIPS 197 compliant, PKCS\#7 padding), USB 2.0 Full-Speed HID Keyboard Class
 \end{itemize}
 
 \vspace{0.3cm}
@@ -134,6 +136,7 @@ This project implements an air-gapped hardware device based on the STM32F103C8T6
 \subsection*{4. Key Features & Security Benefits}
 \begin{itemize}
     \item \textbf{High-Entropy Generation:} Enforces strong 12--16 character mixed passwords, ending reliance on weak or reused passwords.
+    \item \textbf{Interactive On-Device UI:} Real-time visual menu, configurable password length, and live countdown timer for secure visual inspection.
     \item \textbf{Hardware Anti-Keylogger Protection:} Transmits scan codes directly via USB HID endpoints, insulating credentials from host malware and clipboard monitors.
     \item \textbf{AES-128 Flash Security:} Protects data at rest in internal flash memory against unauthorized physical extraction.
     \item \textbf{Universal Plug-and-Play:} Operates driverless across Windows, macOS, Linux, and Android.
@@ -142,11 +145,11 @@ This project implements an air-gapped hardware device based on the STM32F103C8T6
 \vspace{0.3cm}
 
 \subsection*{5. Conclusion}
-The project delivers a secure, low-cost hardware token combining embedded systems programming, cryptographic storage, and USB protocol emulation to solve critical password security vulnerabilities.
+The project delivers a secure, low-cost hardware token combining embedded systems programming, cryptographic storage, USB protocol emulation, and an interactive OLED/rotary interface to solve critical password security vulnerabilities.
 
 \vspace{0.5cm}
 
 \noindent
-\textbf{Keywords:} STM32 Blue Pill, USB HID, AES-128 Encryption, Embedded Security, Hardware Password Manager, Anti-Keylogger.
+\textbf{Keywords:} STM32 Blue Pill, USB HID, AES-128 Encryption, OLED Display, Rotary Encoder, Embedded Security, Hardware Password Manager, Anti-Keylogger.
 
 \end{document}
