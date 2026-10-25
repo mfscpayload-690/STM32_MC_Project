@@ -8,13 +8,15 @@
 
 **KeyPill** is an offline, air-gapped hardware password generator and auto-filler built using the **STM32F103C8T6 (ARM Cortex-M3)** microcontroller. 
 
-When you press the physical button on the device:
-1. **Entropy Harvesting:** Gathers physical entropy from microsecond SysTick timers, floating ADC noise, and the factory-programmed 96-bit STM32 Unique Device ID.
-2. **Password Generation:** Generates a strong 14-character random password guaranteeing a mix of uppercase, lowercase, numbers, and symbols.
-3. **AES-128 Encryption:** Encrypts the password immediately in volatile SRAM using AES-128 (NIST FIPS 197).
-4. **Flash Storage:** Stores the encrypted ciphertext into the STM32's non-volatile internal flash memory.
-5. **Decryption & Auto-Fill:** Decrypts the password and types it directly into the active field on your PC via **USB HID (Human Interface Device) keyboard emulation**, followed by an `ENTER` keystroke.
-6. **SRAM Scrubbing:** Securely zeros out plaintext password buffers from RAM.
+Operating through an intuitive **0.96" 128×64 I2C OLED display** and **EC11 rotary encoder**, KeyPill allows you to:
+1. **Interactive Menu Navigation:** Browse options and view real-time feedback directly on the OLED screen.
+2. **Entropy Harvesting:** Gathers physical entropy from microsecond SysTick timers, floating ADC noise (`PA3`), and the factory-programmed 96-bit STM32 Unique Device ID.
+3. **Password Generation:** Generates a strong random password (configurable 12, 14, or 16 characters) guaranteeing a mix of uppercase, lowercase, numbers, and symbols.
+4. **AES-128 Encryption:** Encrypts credentials in volatile SRAM using AES-128 (NIST FIPS 197).
+5. **Flash Storage:** Stores the encrypted ciphertext into the STM32's non-volatile internal flash memory.
+6. **Decryption & Auto-Fill:** Decrypts the password and types it directly into the active field on your PC via **USB HID (Human Interface Device) keyboard emulation**, followed by an `ENTER` keystroke.
+7. **On-Screen Credential Inspection:** Displays the decrypted password on the OLED with a 6-second live countdown bar before automatic memory scrubbing.
+8. **SRAM Scrubbing:** Securely zeros out plaintext password buffers from RAM.
 
 ---
 
@@ -23,7 +25,7 @@ When you press the physical button on the device:
 | Attack Vector | Traditional Method / Software | KeyPill Hardware Token |
 | :--- | :--- | :--- |
 | **Software Keyloggers** | ❌ Vulnerable to OS-level keystroke sniffing | ✅ Emulates hardware USB keyboard directly; generated offline |
-| **Weak / Reused Passwords** | ❌ Humans choose memorable, predictable strings | ✅ Enforces high-entropy 14-char mixed cryptographic strings |
+| **Weak / Reused Passwords** | ❌ Humans choose memorable, predictable strings | ✅ Enforces high-entropy 12–16 char mixed cryptographic strings |
 | **Cloud Leaks / Breaches** | ❌ Databases can be breached online | ✅ 100% offline, air-gapped device without internet or Bluetooth |
 | **Flash Memory Extraction** | ❌ Plaintext in memory can be dumped | ✅ Stored in Flash as AES-128 encrypted ciphertext |
 
@@ -36,9 +38,9 @@ When you press the physical button on the device:
 | **STM32 Blue Pill** | STM32F103C8T6 (ARM Cortex-M3, 72 MHz) | 1 pc | Core microcontroller unit |
 | **ST-Link V2** | SWD In-Circuit Debugger / Programmer | 1 pc | Firmware flashing & debugging |
 | **OLED Display** | 0.96" 128×64 I2C Module (SSD1306) | 1 pc | Real-time UI, status, & password view |
-| **Rotary Encoder** | KY-040 Quadrature Encoder + Push Switch | 1 pc | Interactive menu navigation & selection |
-| **Status LEDs** | 5mm Standard Green (1 pc), Red (1 pc) | 2 pcs | Success/Typing (Green), Busy/Encrypting (Red) |
-| **Resistors** | 220 Ω (for LEDs), 10 kΩ pull-ups | 4 pcs | Current limiting & GPIO pull-ups |
+| **Rotary Encoder** | EC11 Quadrature Encoder Module + Knob Cap | 1 pc | Interactive menu navigation & selection |
+| **Status LEDs** | 5mm Standard Red (2 pcs), Green (2 pcs) | 4 pcs | Success/Typing (Green), Busy/Encrypting (Red) |
+| **Resistors** | 220 Ω (4 pcs), 10 kΩ pull-ups (5 pcs) | 9 pcs | Current limiting & GPIO pull-ups |
 | **Breadboard & Wires** | Solderless 830-pt + DuPont Jumpers (M-M, M-F) | 1 set | Prototyping interconnections |
 | **USB Micro-B Cable** | High-speed data cable | 1 pc | USB HID Keyboard connection to PC |
 
@@ -66,14 +68,19 @@ When you press the physical button on the device:
 
 ---
 
-### 3. KY-040 Rotary Encoder Module
-| KY-040 Pin | STM32 Blue Pill Pin | Description |
+### 3. EC11 Rotary Encoder Module (Circular 4/5-Pin Module)
+The circular EC11 module provides quadrature rotation (`S1`, `S2`) and an integrated push button (`Key`).
+
+| EC11 Pin Label | STM32 Blue Pill Pin | Description / Function |
 | :---: | :---: | :--- |
-| **`GND`** | **`GND`** | Ground |
-| **`+` (VCC)** | **`3.3V`** | 3.3V Power |
-| **`SW` (Button)** | **`PA0`** | Built-in push switch (Click knob) |
-| **`CLK` (A)** | **`PA1`** | Quadrature Clock output |
-| **`DT` (B)** | **`PA2`** | Quadrature Data output |
+| **`GND`** | **`GND`** | Common Ground |
+| **`S1`** | **`PA1`** | Quadrature Channel A / Clock (`CLK`) |
+| **`S2`** | **`PA2`** | Quadrature Channel B / Data (`DT`) |
+| **`Key`** | **`PA0`** | Built-in push switch (Click knob) |
+| **`5V`** *(Optional)* | **`3.3V`** *(or Unconnected)* | Power rail for on-board SMD pull-up resistors |
+
+> [!TIP]
+> **4-Wire Connection (Recommended):** The firmware configures internal pull-up resistors (`INPUT_PULLUP`) on pins `PA0`, `PA1`, and `PA2`. Therefore, you only need to connect **4 wires** (`GND`, `S1`, `S2`, `Key`). The `5V` pin on the module can be left unconnected. If you choose to connect the `5V` pin, connect it to the **3.3V** rail of the Blue Pill (never connect to 5V!).
 
 ---
 
@@ -83,6 +90,13 @@ When you press the physical button on the device:
 | **Green LED** | **`PA8`** | 220 Ω to GND | Lights up on successful USB typing / ready |
 | **Red LED** | **`PA9`** | 220 Ω to GND | Lights up during AES encryption & flash write |
 | **Onboard LED** | **`PC13`** | Internal | Activity heartbeat (Active LOW) |
+
+---
+
+### 5. Physical Entropy Source
+| Peripheral | STM32 Pin | Connection | Function |
+| :---: | :---: | :---: | :--- |
+| **Floating ADC** | **`PA3`** | Unconnected / Floating | Harvests ambient RF & thermal voltage noise to seed PRNG |
 
 ---
 
@@ -158,14 +172,17 @@ Go to the **Tools** menu in Arduino IDE and select the following settings:
 4. Click the **Upload** arrow button (`Ctrl + U`).
 5. Once uploaded, open **Notepad**, **TextEdit**, or any browser login page.
 6. Place your cursor into the password field.
-7. **Press the button on PA0**:
-   - The Blue Pill generates a new password.
-   - It encrypts and saves it to internal flash.
-   - It automatically types the password into the field and presses **ENTER**!
+7. **Navigate using the Rotary Encoder**:
+   - The device displays a splash screen, followed by the main interactive menu on the 128×64 OLED.
+   - **Rotate Knob:** Move cursor up/down through the 5 options.
+   - **Click Knob (`SW` on PA0):** Execute the highlighted function.
 
-### Button Control Modes:
-- **Short Press (< 2 seconds):** Generates a brand-new random password, saves to flash, and types it.
-- **Long Press (> 2 seconds):** Re-types the currently saved password from flash (useful when logging into your existing account again!).
+### Interactive Menu Actions:
+- **`1. AutoFill New`:** Harvests hardware entropy (PA3 ADC + SysTick + Chip UID), generates a fresh high-entropy password, encrypts via AES-128, writes to internal flash, and automatically types it into the active field on your PC via USB HID + `ENTER`.
+- **`2. AutoFill Saved`:** Reads the existing ciphertext from flash, decrypts with AES-128 in SRAM, and types it into the active field + `ENTER`.
+- **`3. View Password`:** Decrypts and shows the password directly on the OLED screen with a 6-second live progress bar countdown before auto-scrubbing RAM and clearing the display (or click knob to exit immediately).
+- **`4. Set Length`:** Rotate knob to cycle between 12, 14, and 16 characters; click to confirm.
+- **`5. System Info`:** Displays MCU frequency (72 MHz), crypto standard (AES-128 NIST), flash storage page, and USB HID status.
 
 ---
 
@@ -199,13 +216,17 @@ make test
 ```
 STM32-bluepill/
 ├── KeyPill/                       # Main Arduino IDE Sketch Folder
-│   ├── KeyPill.ino                # Main program entry, button debounce, USB HID typing
+│   ├── KeyPill.ino                # Main program, menu state machine & USB HID typing
 │   ├── aes128.h                   # Standalone AES-128 header
 │   ├── aes128.cpp                 # NIST FIPS 197 AES-128 implementation
 │   ├── password_gen.h             # Password generator header
 │   ├── password_gen.cpp           # Hardware-entropy PRNG & Fisher-Yates generator
 │   ├── storage.h                  # Flash/EEPROM memory manager header
-│   └── storage.cpp                # Flash/EEPROM storage implementation
+│   ├── storage.cpp                # Flash/EEPROM storage implementation
+│   ├── oled_ssd1306.h             # Self-contained 128x64 I2C SSD1306 OLED driver
+│   ├── oled_ssd1306.cpp           # OLED graphics primitives & text renderer
+│   ├── rotary_encoder.h           # EC11 rotary encoder header with debounce
+│   └── rotary_encoder.cpp         # Quadrature decoder & switch state machine
 ├── docs/
 │   ├── abstract.tex               # 2-Page Project Abstract (LaTeX)
 │   ├── setup_guide.md             # Step-by-step beginner setup guide
