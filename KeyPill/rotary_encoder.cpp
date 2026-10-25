@@ -1,11 +1,14 @@
 /**
  * @file rotary_encoder.cpp
- * @brief KY-040 Rotary Encoder Implementation
+ * @brief EC11 / KY-040 Rotary Encoder Implementation
  */
 
 #include "rotary_encoder.h"
 
 #if defined(ARDUINO)
+#ifndef GCC_VERSION
+#define GCC_VERSION 140201
+#endif
 #include <Arduino.h>
 #endif
 
