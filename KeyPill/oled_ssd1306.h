@@ -1,7 +1,7 @@
 /**
  * @file oled_ssd1306.h
- * @brief Self-contained 128x64 I2C SSD1306 OLED Driver for STM32 Blue Pill
- *        Uses standard built-in <Wire.h> - ZERO external library dependencies!
+ * @brief 128x64 I2C SSD1306 OLED Driver for STM32 Blue Pill
+ *        Backed by Adafruit_SSD1306 on hardware with unit test fallback.
  */
 
 #ifndef OLED_SSD1306_H
@@ -10,8 +10,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define OLED_WIDTH   128
-#define OLED_HEIGHT  64
+#define OLED_WIDTH    128
+#define OLED_HEIGHT   64
 #define OLED_I2C_ADDR 0x3C  // Standard 0.96" OLED I2C address (0x3C or 0x3D)
 
 class SSD1306Display {
@@ -46,10 +46,7 @@ private:
     int16_t _cursor_y;
     uint8_t _text_color;
     uint8_t _text_size;
-    uint8_t _buffer[OLED_WIDTH * OLED_HEIGHT / 8]; // 1024-byte framebuffer
-
-    void sendCommand(uint8_t cmd);
-    void drawChar(int16_t x, int16_t y, unsigned char c, uint8_t color, uint8_t size);
+    uint8_t _buffer[OLED_WIDTH * OLED_HEIGHT / 8];
 };
 
 extern SSD1306Display OLED;
