@@ -11,6 +11,8 @@
 
 #define STORAGE_MAGIC 0x4B50494C // "KPIL" (KeyPill identifier)
 
+#define STORAGE_NUM_SLOTS 10 // 10 distinct non-volatile password slots
+
 struct PasswordRecord {
     uint32_t magic;              // Validation magic number (0x4B50494C)
     uint8_t  password_len;       // Plaintext password length (e.g. 14)
@@ -29,17 +31,19 @@ extern "C" {
 void storage_init(void);
 
 /**
- * @brief Save an encrypted password record to non-volatile flash memory.
- * @param record Pointer to populated PasswordRecord.
- * @return 1 on success, 0 on failure.
+ * @brief Multi-slot storage operations (slot: 0 to STORAGE_NUM_SLOTS - 1).
  */
-int storage_save_record(const struct PasswordRecord *record);
+int storage_save_slot(uint8_t slot, const struct PasswordRecord *record);
+int storage_load_slot(uint8_t slot, struct PasswordRecord *record);
+int storage_clear_slot(uint8_t slot);
+int storage_is_slot_occupied(uint8_t slot);
+int storage_find_first_empty_slot(void); // Returns 0..9, or -1 if full (10/10)
+uint8_t storage_count_occupied(void);
 
 /**
- * @brief Load an encrypted password record from non-volatile flash memory.
- * @param record Pointer to destination PasswordRecord buffer.
- * @return 1 if valid record found, 0 if empty or corrupted.
+ * @brief Backward-compatibility single-record functions (maps to slot 0).
  */
+int storage_save_record(const struct PasswordRecord *record);
 int storage_load_record(struct PasswordRecord *record);
 
 /**
