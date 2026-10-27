@@ -90,6 +90,30 @@ void SSD1306Display::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_
 #endif
 }
 
+void SSD1306Display::drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint8_t color) {
+#if defined(ARDUINO)
+    s_display.drawRoundRect(x, y, w, h, r, color ? SSD1306_WHITE : SSD1306_BLACK);
+#endif
+}
+
+void SSD1306Display::fillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint8_t color) {
+#if defined(ARDUINO)
+    s_display.fillRoundRect(x, y, w, h, r, color ? SSD1306_WHITE : SSD1306_BLACK);
+#endif
+}
+
+void SSD1306Display::drawCircle(int16_t x0, int16_t y0, int16_t r, uint8_t color) {
+#if defined(ARDUINO)
+    s_display.drawCircle(x0, y0, r, color ? SSD1306_WHITE : SSD1306_BLACK);
+#endif
+}
+
+void SSD1306Display::fillCircle(int16_t x0, int16_t y0, int16_t r, uint8_t color) {
+#if defined(ARDUINO)
+    s_display.fillCircle(x0, y0, r, color ? SSD1306_WHITE : SSD1306_BLACK);
+#endif
+}
+
 void SSD1306Display::drawProgressBar(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t progress_percent) {
     if (progress_percent > 100) progress_percent = 100;
 #if defined(ARDUINO)
