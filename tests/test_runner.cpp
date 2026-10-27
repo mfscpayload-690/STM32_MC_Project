@@ -119,6 +119,53 @@ void test_storage_pipeline(void) {
     printf("    [PASS] Storage integrity verified!\n");
 }
 
+void test_multi_slot_storage(void) {
+    printf("[*] Running 10-Slot Multi-Password Storage Test...\n");
+    storage_init();
+
+    // 1. Initial state: all slots empty
+    assert(storage_count_occupied() == 0);
+    assert(storage_find_first_empty_slot() == 0);
+
+    // 2. Fill slots 0 through 9 sequentially
+    for (uint8_t s = 0; s < 10; ++s) {
+        assert(storage_find_first_empty_slot() == s);
+
+        struct PasswordRecord rec;
+        rec.magic = STORAGE_MAGIC;
+        rec.password_len = 12 + (s % 5);
+        rec.encrypted_len = 16;
+        memset(rec.encrypted_data, 0x10 + s, 16);
+        rec.checksum = storage_compute_checksum(&rec);
+
+        int ok = storage_save_slot(s, &rec);
+        assert(ok == 1);
+        assert(storage_is_slot_occupied(s) == 1);
+    }
+
+    // 3. Vault is now completely full (10/10)
+    assert(storage_count_occupied() == 10);
+    assert(storage_find_first_empty_slot() == -1);
+
+    // 4. Verify each slot retained its distinct data
+    for (uint8_t s = 0; s < 10; ++s) {
+        struct PasswordRecord loaded;
+        int ok = storage_load_slot(s, &loaded);
+        assert(ok == 1);
+        assert(loaded.password_len == 12 + (s % 5));
+        assert(loaded.encrypted_data[0] == 0x10 + s);
+    }
+
+    // 5. Clear Slot 4
+    assert(storage_clear_slot(4) == 1);
+    assert(storage_is_slot_occupied(4) == 0);
+    assert(storage_count_occupied() == 9);
+    // Next available slot should now be 4!
+    assert(storage_find_first_empty_slot() == 4);
+
+    printf("    [PASS] 10-slot multi-password storage verified (sequential fill, full alert, clear slot)!\n");
+}
+
 int main(void) {
     printf("====================================================\n");
     printf("  KeyPill Unit Test Runner (Host-side validation)  \n");
@@ -128,6 +175,7 @@ int main(void) {
     test_padded_encryption();
     test_password_generation();
     test_storage_pipeline();
+    test_multi_slot_storage();
 
     printf("\n>>> ALL TESTS PASSED SUCCESSFULLY! <<<\n");
     return 0;
