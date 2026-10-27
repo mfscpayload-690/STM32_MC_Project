@@ -40,6 +40,7 @@ public:
     void setCursor(int16_t x, int16_t y);
     void setTextColor(uint8_t color); // 1 = White, 0 = Black (inverted)
     void setTextSize(uint8_t size);   // 1 = normal (6x8), 2 = double (12x16)
+    void setTextWrap(bool wrap);      // Disable auto-wrapping across borders
     void print(char c);
     void print(const char *text);
     void print(int value);
