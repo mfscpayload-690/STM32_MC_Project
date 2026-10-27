@@ -35,6 +35,7 @@ bool SSD1306Display::begin(uint8_t i2c_addr) {
     s_display.clearDisplay();
     s_display.setTextColor(SSD1306_WHITE);
     s_display.setTextSize(1);
+    s_display.setTextWrap(false); // Disable auto-wrapping to prevent text spilling over UI borders
     s_display.display();
     return true;
 #else
@@ -150,6 +151,12 @@ void SSD1306Display::setTextSize(uint8_t size) {
     _text_size = (size > 0) ? size : 1;
 #if defined(ARDUINO)
     s_display.setTextSize(_text_size);
+#endif
+}
+
+void SSD1306Display::setTextWrap(bool wrap) {
+#if defined(ARDUINO)
+    s_display.setTextWrap(wrap);
 #endif
 }
 
