@@ -30,6 +30,10 @@ public:
     void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint8_t color);
     void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color);
     void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color);
+    void drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint8_t color);
+    void fillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint8_t color);
+    void drawCircle(int16_t x0, int16_t y0, int16_t r, uint8_t color);
+    void fillCircle(int16_t x0, int16_t y0, int16_t r, uint8_t color);
     void drawProgressBar(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t progress_percent);
 
     // Text output
