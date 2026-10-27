@@ -101,11 +101,11 @@ struct CardInfo {
 };
 
 static const CardInfo CARDS[MENU_TOTAL_ITEMS] = {
-    { "1/5", "1. AUTO-FILL NEW",   "Next Free Slot (1-10)", "AES-128 Flash" },
-    { "2/5", "2. AUTO-FILL SAVED", "Choose Slot & Type",    "10-Slot Vault" },
-    { "3/5", "3. VIEW PASSWORD",   "Inspect Stored Slot",   "6s Auto-Clear" },
-    { "4/5", "4. SET LENGTH",      "Configure Password",    "12 / 14 / 16 chars" },
-    { "5/5", "5. SYSTEM INFO",     "Device Diagnostics",    "STM32 Cortex-M3" }
+    { "1/5", "1. AUTO-FILL NEW",   "Next: Slot 01/10",   "AES-128 Flash" },
+    { "2/5", "2. AUTO-FILL SAVED", "Vault: X/10 Used",    "10-Slot Vault" },
+    { "3/5", "3. VIEW PASSWORD",   "Vault: X/10 Used",    "6s Auto-Clear" },
+    { "4/5", "4. SET LENGTH",      "Length: 14 Chars",    "12 / 14 / 16 chars" },
+    { "5/5", "5. SYSTEM INFO",     "Device Diagnostics",  "STM32 Cortex-M3" }
 };
 
 // ------------------------------------------------------------------------------
@@ -136,6 +136,67 @@ void secure_zero_memory(void *v, size_t n) {
 // ------------------------------------------------------------------------------
 // OLED Card & Carousel Renderers (Single Option at a Time with Borders)
 // ------------------------------------------------------------------------------
+static uint32_t g_card_selected_time = 0;
+static bool     g_marquee_active = false;
+
+/**
+ * @brief Renders text with automatic Ping-Pong horizontal scrolling if it exceeds max_w.
+ *        Masks off any pixels outside the [x, x + max_w] window so borders stay clean.
+ * @return True if text is longer than max_w and currently animated, false if static.
+ */
+bool render_marquee_text(int16_t x, int16_t y, int16_t max_w, const char *text, uint32_t start_time) {
+    if (!text) return false;
+    size_t len = strlen(text);
+    int16_t text_px = (int16_t)(len * 6); // 6 px per character at font size 1
+
+    if (text_px <= max_w) {
+        // Fits comfortably within window: render static text with zero overhead
+        OLED.setCursor(x, y);
+        OLED.print(text);
+        return false;
+    }
+
+    // Text exceeds width: Ping-Pong marquee calculation
+    int16_t overflow_px = text_px - max_w;
+    const uint32_t PAUSE_START_MS   = 1200; // Pause at beginning
+    const uint32_t SCROLL_MS_PER_PX = 35;   // 35ms per pixel (smooth and readable)
+    const uint32_t PAUSE_END_MS     = 1000; // Pause at end
+    uint32_t scroll_duration = (uint32_t)overflow_px * SCROLL_MS_PER_PX;
+    uint32_t total_period = PAUSE_START_MS + scroll_duration + PAUSE_END_MS + scroll_duration;
+
+    uint32_t elapsed = (millis() - start_time) % total_period;
+    int16_t x_offset = 0;
+
+    if (elapsed < PAUSE_START_MS) {
+        x_offset = 0;
+    } else if (elapsed < PAUSE_START_MS + scroll_duration) {
+        x_offset = (int16_t)((elapsed - PAUSE_START_MS) / SCROLL_MS_PER_PX);
+    } else if (elapsed < PAUSE_START_MS + scroll_duration + PAUSE_END_MS) {
+        x_offset = overflow_px;
+    } else {
+        uint32_t back_elapsed = elapsed - (PAUSE_START_MS + scroll_duration + PAUSE_END_MS);
+        x_offset = overflow_px - (int16_t)(back_elapsed / SCROLL_MS_PER_PX);
+    }
+
+    // Render text with offset
+    OLED.setCursor(x - x_offset, y);
+    OLED.print(text);
+
+    // Hardware mask: Clear any pixel leakage outside the bounding box [x, x + max_w]
+    if (x > 0) {
+        OLED.fillRect(0, y - 1, x, 10, 0);
+    }
+    if (x + max_w < OLED_WIDTH) {
+        OLED.fillRect(x + max_w, y - 1, OLED_WIDTH - (x + max_w), 10, 0);
+    }
+
+    // Repair the surrounding card borders that touch the mask
+    OLED.drawRoundRect(6, 16, 116, 33, 3, 1);
+    OLED.drawRoundRect(0, 0, 128, 64, 4, 1);
+
+    return true;
+}
+
 void render_menu_screen() {
     set_leds(true, false); // Green LED ON = System Ready in Menu
     if (!g_oled_available) return;
@@ -167,31 +228,28 @@ void render_menu_screen() {
     OLED.setCursor(12, 20);
     OLED.print(CARDS[g_menu_selection].title);
 
-    // Subtitle Description inside Card
+    // Subtitle Description inside Card (using Marquee helper)
     OLED.setTextColor(1); // Normal white text
-    OLED.setCursor(10, 34);
+    char sub_buf[48];
     if (g_menu_selection == 0) {
         int empty_s = storage_find_first_empty_slot();
         if (empty_s >= 0) {
-            OLED.print("Next: Slot ");
-            OLED.print(empty_s + 1);
-            OLED.print("/10");
+            snprintf(sub_buf, sizeof(sub_buf), "Next: Slot %02d/10", empty_s + 1);
         } else {
-            OLED.print("Vault Full (10/10)");
+            snprintf(sub_buf, sizeof(sub_buf), "Vault Full (10/10)");
         }
     } else if (g_menu_selection == 1 || g_menu_selection == 2) {
-        OLED.print("Vault: ");
-        OLED.print((int)storage_count_occupied());
-        OLED.print("/10 slots used");
+        snprintf(sub_buf, sizeof(sub_buf), "Vault: %d/10 Used", (int)storage_count_occupied());
     } else if (g_menu_selection == 3) {
-        OLED.print("Length: ");
-        OLED.print((int)g_password_length);
-        OLED.print(" characters");
+        snprintf(sub_buf, sizeof(sub_buf), "Length: %d Chars", (int)g_password_length);
     } else {
-        OLED.print(CARDS[g_menu_selection].desc);
+        snprintf(sub_buf, sizeof(sub_buf), "%s", CARDS[g_menu_selection].desc);
     }
 
+    g_marquee_active = render_marquee_text(10, 34, 108, sub_buf, g_card_selected_time);
+
     // 4. Bottom Footer Navigation Hints
+    OLED.setTextColor(1);
     OLED.drawLine(4, 51, 123, 51, 1);
     OLED.setCursor(10, 53);
     OLED.print("< Turn >   [SELECT]");
@@ -427,7 +485,7 @@ void execute_auto_fill_new() {
     snprintf(slot_label, sizeof(slot_label), "Saved to Slot %02d", slot + 1);
 
     set_leds(false, true); // Red LED: Busy
-    render_action_card("AUTO-FILL NEW", "1/3 Harvesting Entropy...", 25);
+    render_action_card("AUTO-FILL NEW", "1/3 Harvest Entropy", 25);
     delay(200);
 
     char plaintext_pass[MAX_PASSWORD_LEN + 1];
@@ -443,7 +501,7 @@ void execute_auto_fill_new() {
     size_t pass_len = strlen(plaintext_pass);
 
     // AES-128 Encryption & Save to specific Slot
-    render_action_card("AUTO-FILL NEW", "2/3 AES-128 Encrypting...", 60);
+    render_action_card("AUTO-FILL NEW", "2/3 AES-128 Encrypt", 60);
     delay(200);
 
     struct PasswordRecord record;
@@ -472,7 +530,7 @@ void execute_auto_fill_new() {
         digitalWrite(PIN_LED_RED, LOW);
         Keyboard.write((uint8_t)plaintext_pass[i]);
         uint8_t pct = 60 + (uint8_t)(((i + 1) * 40) / pass_len);
-        render_action_card("AUTO-FILL NEW", "3/3 Typing via USB...", pct);
+        render_action_card("AUTO-FILL NEW", "3/3 USB Typing...", pct);
         delay(35);
     }
     Keyboard.write(KEY_RETURN);
@@ -481,7 +539,7 @@ void execute_auto_fill_new() {
     secure_zero_memory(&record, sizeof(record));
 
     set_leds(true, false); // Green LED Solid: Success
-    render_success_card("PASSWORD GENERATED!", slot_label, "Typed & Saved to Flash");
+    render_success_card("PASSWORD GENERATED!", slot_label, "Saved & Typed to PC");
     delay(1500);
 }
 
@@ -504,7 +562,7 @@ void execute_auto_fill_saved() {
     }
 
     set_leds(false, true); // Red LED: Busy
-    render_action_card("AUTO-FILL SAVED", "Reading Slot Data...", 30);
+    render_action_card("AUTO-FILL SAVED", "Reading Slot Data", 30);
     delay(200);
 
     struct PasswordRecord record;
@@ -517,7 +575,7 @@ void execute_auto_fill_saved() {
         return;
     }
 
-    render_action_card("AUTO-FILL SAVED", "Decrypting AES-128...", 60);
+    render_action_card("AUTO-FILL SAVED", "Decrypting AES-128", 60);
     delay(200);
 
     char plaintext_pass[MAX_PASSWORD_LEN + 1];
@@ -547,7 +605,7 @@ void execute_auto_fill_saved() {
         digitalWrite(PIN_LED_RED, LOW);
         Keyboard.write((uint8_t)plaintext_pass[i]);
         uint8_t pct = 60 + (uint8_t)(((i + 1) * 40) / dec_len);
-        render_action_card("AUTO-FILL SAVED", "Typing via USB...", pct);
+        render_action_card("AUTO-FILL SAVED", "3/3 USB Typing...", pct);
         delay(35);
     }
     Keyboard.write(KEY_RETURN);
@@ -850,6 +908,7 @@ void setup() {
         delay(2100);   // Hold completed screen for 2.1s -> Total boot time = 4.0 seconds
     }
 
+    g_card_selected_time = millis();
     render_menu_screen();
 }
 
@@ -869,6 +928,7 @@ void loop() {
         g_menu_selection += rot;
         if (g_menu_selection < 0) g_menu_selection = MENU_TOTAL_ITEMS - 1;
         if (g_menu_selection >= MENU_TOTAL_ITEMS) g_menu_selection = 0;
+        g_card_selected_time = millis(); // Reset marquee cycle on card change
         render_menu_screen();
     }
 
@@ -891,6 +951,14 @@ void loop() {
                 execute_sys_info();
                 break;
         }
+        g_card_selected_time = millis();
+        render_menu_screen();
+    }
+
+    // Smooth ~25 FPS ticker animation if text is overflowing its card boundaries
+    static uint32_t last_marquee_tick = 0;
+    if (g_marquee_active && (millis() - last_marquee_tick >= 40)) {
+        last_marquee_tick = millis();
         render_menu_screen();
     }
 
