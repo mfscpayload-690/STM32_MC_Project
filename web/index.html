@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KeyPill | Hardware Credential Manager &amp; Keystroke Telemetry Bench</title>
+  <meta name="description" content="Open-source hardware password manager test portal and real-time USB HID keystroke telemetry bench for STM32 Blue Pill.">
+
+  <!-- Typography: Inter for UI, JetBrains Mono for Hardware Telemetry & Terminal -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            <circle cx="12" cy="14" r="2"></circle>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <span class="brand-title">KeyPill <span class="tag-version">v1.0</span></span>
+          <span class="brand-sub">STM32F103C8T6 Hardware Token Test Bench</span>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Hardware Link Status -->
+        <div class="hw-status-pill">
+          <span class="status-dot online" id="hw-status-dot"></span>
+          <span class="status-label">Interface:</span>
+          <span class="status-val font-mono" id="hw-status-text">USB HID / SWD Ready</span>
+        </div>
+
+        <!-- Open Source Simulator Shortcuts (Instant demo without hardware) -->
+        <div class="sim-pill-group">
+          <span class="sim-label">Simulate Hardware:</span>
+          <button type="button" class="btn-nav-sim" data-sim="12" title="Simulate 12-character KeyPill burst">12 ch</button>
+          <button type="button" class="btn-nav-sim" data-sim="14" title="Simulate 14-character KeyPill burst">14 ch</button>
+          <button type="button" class="btn-nav-sim" data-sim="16" title="Simulate 16-character KeyPill burst">16 ch</button>
+        </div>
+
+        <!-- GitHub Open Source Link -->
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="btn-github" title="View Source on GitHub">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+          </svg>
+          <span>Open Source</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Split Layout -->
+  <main class="main-layout">
+
+    <!-- ============================================================== -->
+    <!-- LEFT PANEL: SaaS Demo Login Card                               -->
+    <!-- ============================================================== -->
+    <section class="left-panel">
+      <div class="login-card">
+        
+        <div class="card-title-row">
+          <div class="auth-icon-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+          </div>
+          <div>
+            <h1 class="card-heading">Authentication Portal</h1>
+            <p class="card-subheading">Sign in using your KeyPill hardware token or test credentials.</p>
+          </div>
+        </div>
+
+        <!-- Success Notification Banner (Visible upon authenticated fill) -->
+        <div id="auth-success-banner" class="alert-banner success hidden">
+          <div class="alert-icon">✓</div>
+          <div class="alert-content">
+            <div class="alert-title">Authentication Successful</div>
+            <div class="alert-details" id="auth-success-details">
+              Verified <strong>admin@keypill.local</strong> &bull; Length: 14 chars &bull; Entropy: 88.5 bits
+            </div>
+          </div>
+          <button type="button" class="btn-alert-action" id="btn-rearm-after-success" title="Reset and prepare for next hardware fill">
+            Next Test &rarr;
+          </button>
+        </div>
+
+        <!-- Focus & Ready Trigger -->
+        <div class="focus-bar" id="focus-bar">
+          <button type="button" id="btn-focus-password" class="btn-focus">
+            <span class="focus-dot"></span>
+            <span id="focus-button-label">Focus Password Field for Hardware Input</span>
+          </button>
+          <div class="focus-instruction">
+            <span>Hardware Workflow:</span> Click above &bull; On KeyPill OLED, rotate to <kbd>AutoFill New</kbd> or <kbd>AutoFill Saved</kbd> &bull; Click knob.
+          </div>
+        </div>
+
+        <!-- Standard Login Form -->
+        <form id="login-form" class="auth-form" novalidate autocomplete="off">
+          
+          <!-- Username / Account (Prefilled as admin) -->
+          <div class="form-field">
+            <div class="label-row">
+              <label for="input-username" class="field-label">Username / Email</label>
+              <span class="field-hint">Prefilled Administrator</span>
+            </div>
+            <div class="input-wrap">
+              <span class="input-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </span>
+              <input 
+                type="text" 
+                id="input-username" 
+                name="username" 
+                class="form-control" 
+                value="admin@keypill.local" 
+                required 
+                autocomplete="username" 
+                spellcheck="false">
+            </div>
+          </div>
+
+          <!-- Password Field (Hardware Keystroke Target) -->
+          <div class="form-field">
+            <div class="label-row">
+              <label for="input-password" class="field-label">Password / Hardware Keystroke Input</label>
+              <span class="field-hint" id="password-spec-hint">KeyPill Payload: 12, 14, or 16 chars</span>
+            </div>
+            
+            <div class="input-wrap password-wrap" id="password-field-container">
+              <span class="input-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0110 0v4"></path>
+                </svg>
+              </span>
+
+              <input 
+                type="password" 
+                id="input-password" 
+                name="password" 
+                class="form-control font-mono" 
+                placeholder="Click here & trigger KeyPill hardware..."
+                required 
+                autocomplete="current-password"
+                enterkeyhint="go"
+                aria-describedby="password-rules-pills"
+                aria-errormessage="password-error-alert">
+
+              <button 
+                type="button" 
+                id="btn-toggle-pwd" 
+                class="btn-reveal-pwd" 
+                title="Toggle plain-text visibility" 
+                aria-label="Toggle password visibility">
+                <span id="eye-label-show">Show</span>
+                <span id="eye-label-hide" class="hidden">Hide</span>
+              </button>
+            </div>
+
+            <!-- Error Notification -->
+            <div id="password-error-alert" class="error-alert hidden" role="alert">
+              <span class="error-badge">Error</span>
+              <span id="error-message-text">Credential does not meet requirements.</span>
+            </div>
+
+            <!-- NIST Four-Class Complexity Tags -->
+            <div id="password-rules-pills" class="rules-tags-row">
+              <span class="rule-chip" id="rule-len">12, 14, 16 Chars</span>
+              <span class="rule-chip" id="rule-upper">Uppercase (A-Z)</span>
+              <span class="rule-chip" id="rule-lower">Lowercase (a-z)</span>
+              <span class="rule-chip" id="rule-digit">Digits (0-9)</span>
+              <span class="rule-chip" id="rule-sym">Symbols (!@#)</span>
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="form-btn-row">
+            <button type="submit" id="btn-login-submit" class="btn-submit">
+              <span>Sign In</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"></path>
+              </svg>
+            </button>
+            <button type="button" id="btn-clear-input" class="btn-clear">
+              Clear
+            </button>
+          </div>
+
+        </form>
+
+        <!-- Quick Demo Tips -->
+        <div class="demo-footer">
+          <span class="demo-footer-title">Open Source Tip:</span>
+          <p class="demo-footer-text">
+            KeyPill connects as a standard USB HID Keyboard. Keystroke timing, inter-key delay, and entropy are captured automatically as the STM32 Blue Pill types into the field.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- RIGHT PANEL: Hardware Telemetry, Real Status & Logs             -->
+    <!-- ============================================================== -->
+    <section class="right-panel">
+      <div class="telemetry-stack">
+
+        <!-- 1. Real-Time Telemetry Metrics Grid -->
+        <div class="panel-card">
+          <div class="card-header-flex">
+            <div>
+              <h2 class="panel-title">Hardware Telemetry Engine</h2>
+              <p class="panel-subtitle">Live measurements from STM32 USB HID / SWD keystroke stream</p>
+            </div>
+            <span class="status-indicator-badge" id="telemetry-live-badge">LISTENING</span>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric-box">
+              <span class="metric-label">Sample Size (Length)</span>
+              <div class="metric-number-row">
+                <span class="metric-num font-mono" id="metric-chars">0</span>
+                <span class="metric-unit">chars</span>
+              </div>
+              <span class="metric-foot" id="metric-chars-expected">Expected: 12, 14, 16</span>
+            </div>
+
+            <div class="metric-box">
+              <span class="metric-label">Mean Inter-Key Delay (&Delta;t)</span>
+              <div class="metric-number-row">
+                <span class="metric-num font-mono" id="metric-delay">0.0</span>
+                <span class="metric-unit">ms</span>
+              </div>
+              <span class="metric-foot font-mono" id="metric-speed">0.0 chars/sec</span>
+            </div>
+
+            <div class="metric-box">
+              <span class="metric-label">Shannon Entropy (H)</span>
+              <div class="metric-number-row">
+                <span class="metric-num font-mono text-cyan" id="metric-entropy">0.0</span>
+                <span class="metric-unit">bits</span>
+              </div>
+              <span class="metric-foot" id="metric-entropy-rating">Awaiting payload</span>
+            </div>
+
+            <div class="metric-box">
+              <span class="metric-label">Input Source Classifier</span>
+              <div class="metric-number-row">
+                <span class="metric-num font-mono" id="metric-source">IDLE</span>
+              </div>
+              <span class="metric-foot" id="metric-source-sub">Waiting for input stream</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Inter-Keystroke Interval Distribution Histogram -->
+        <div class="panel-card">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="panel-subheading">Inter-Keystroke Interval Distribution (&Delta;t in ms per character)</h3>
+              <p class="panel-subtitle">Visualizes individual keystroke transmission delays over the USB HID bus</p>
+            </div>
+            <div class="sparkline-stats">
+              <span class="stat-pill font-mono" id="stat-jitter">Jitter: &plusmn;0.0 ms</span>
+              <span class="stat-pill font-mono" id="stream-enter-badge">Return: Awaiting</span>
+            </div>
+          </div>
+
+          <div class="histogram-container" id="latency-bars-container">
+            <div class="empty-hist-hint">Keystroke timing profile will plot here in real time as characters stream in.</div>
+          </div>
+
+          <div class="histogram-axis">
+            <span>Character Index: 1 &rarr; N</span>
+            <span>Threshold: &lt; 50ms (Hardware HID) | &gt; 100ms (Human Typist)</span>
+          </div>
+        </div>
+
+        <!-- 3. Buffer Stream Preview & Character Partition -->
+        <div class="panel-card">
+          <div class="card-header-flex">
+            <h3 class="panel-subheading">Buffer Stream &amp; Character Partition</h3>
+            <span class="badge-tag font-mono" id="buffer-byte-count">0 bytes</span>
+          </div>
+
+          <!-- Buffer Preview Box -->
+          <div class="buffer-display-box font-mono" id="stream-display">
+            <span class="buffer-placeholder">[Buffer Empty &bull; Ready to capture USB HID keystrokes]</span>
+          </div>
+
+          <!-- Character Class Partition -->
+          <div class="charset-grid">
+            <div class="charset-cell">
+              <span class="charset-tag">Uppercase [A-Z]</span>
+              <span class="charset-val font-mono" id="count-upper">0</span>
+            </div>
+            <div class="charset-cell">
+              <span class="charset-tag">Lowercase [a-z]</span>
+              <span class="charset-val font-mono" id="count-lower">0</span>
+            </div>
+            <div class="charset-cell">
+              <span class="charset-tag">Digits [0-9]</span>
+              <span class="charset-val font-mono" id="count-digit">0</span>
+            </div>
+            <div class="charset-cell">
+              <span class="charset-tag">Symbols [!@#$%]</span>
+              <span class="charset-val font-mono" id="count-symbol">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. KeyPill Hardware Device Profile -->
+        <div class="panel-card">
+          <h3 class="panel-subheading">KeyPill Hardware Device Profile</h3>
+          <div class="device-spec-grid font-mono">
+            <div class="spec-item">
+              <span class="spec-k">Microcontroller:</span>
+              <span class="spec-v">STM32F103C8T6 (72 MHz ARM Cortex-M3)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-k">Cryptographic Engine:</span>
+              <span class="spec-v">AES-128 NIST FIPS 197 (CBC / ECB)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-k">Non-Volatile Storage:</span>
+              <span class="spec-v">Internal Flash Page 63 (0x0800FC00)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-k">Physical Entropy:</span>
+              <span class="spec-v">Floating ADC (PA3) + SysTick + 96-bit UID</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-k">Input Interface:</span>
+              <span class="spec-v">EC11 Rotary Encoder + 0.96" SSD1306 OLED</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-k">Transport Method:</span>
+              <span class="spec-v text-cyan">USB HID Keyboard / SWD Mailbox</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Live Event Log Terminal & Export -->
+        <div class="panel-card">
+          <div class="card-header-flex">
+            <div>
+              <h3 class="panel-subheading">Live Event Log &amp; Audit Trail</h3>
+              <p class="panel-subtitle">Real-time timestamped event stream of all authentication attempts</p>
+            </div>
+            <div class="log-actions">
+              <button type="button" class="btn-log-action" id="btn-export-csv" title="Export logs as CSV">Export CSV</button>
+              <button type="button" class="btn-log-action" id="btn-export-json" title="Export logs as JSON">Export JSON</button>
+              <button type="button" class="btn-log-action btn-danger" id="btn-clear-logs" title="Clear event log">Clear</button>
+            </div>
+          </div>
+
+          <div class="terminal-window font-mono" id="event-log-terminal">
+            <div class="terminal-line"><span class="log-ts">[BOOT]</span> <span class="log-info">KeyPill hardware telemetry test bench initialized.</span></div>
+            <div class="terminal-line"><span class="log-ts">[READY]</span> <span class="log-success">Listening for USB HID Keyboard emulation on password field...</span></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
