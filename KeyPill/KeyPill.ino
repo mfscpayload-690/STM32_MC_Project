@@ -34,7 +34,6 @@
 #define GCC_VERSION 140201
 #endif
 #include <Arduino.h>
-#include <Keyboard.h>
 #include "aes128.h"
 #include "password_gen.h"
 #include "storage.h"
@@ -49,9 +48,33 @@
 #define PIN_ENCODER_DT   PA2   // EC11 S2 (Quadrature Data / Phase B)
 #define PIN_ENTROPY_ADC  PA3   // Unconnected floating analog pin for RF/thermal noise
 
-#define PIN_LED_GREEN    PA9   // External Green LED (Success / Standby / USB Typing)
+#define PIN_LED_GREEN    PA9   // External Green LED (Success / Standby / Typing)
 #define PIN_LED_RED      PA8   // External Red LED (Encrypting / Busy / Alert)
 #define PIN_STATUS_LED   PC13  // Onboard Blue Pill LED (active LOW: LOW = ON)
+
+// ------------------------------------------------------------------------------
+// ST-Link SWD Shared Memory Mailbox
+// ------------------------------------------------------------------------------
+#define MAILBOX_MAGIC        0x4B50494CU // 'KPIL' in little-endian
+#define MAILBOX_IDLE         0U
+#define MAILBOX_PENDING_TYPE 1U
+#define MAILBOX_TYPED_OK     2U
+#define MAILBOX_ERROR        3U
+
+struct __attribute__((packed, aligned(4))) KeyPillMailbox {
+    volatile uint32_t magic;      // 0x4B50494C ('KPIL')
+    volatile uint32_t status;     // 0 = IDLE, 1 = PENDING_TYPE, 2 = TYPED_OK
+    volatile uint32_t length;     // Password length
+    volatile char     password[64]; // Plaintext password buffer (wiped immediately after typing)
+};
+
+// Global mailbox accessed transparently in real-time by keypill_daemon.py via SWD
+__attribute__((used)) volatile KeyPillMailbox g_mailbox = {
+    MAILBOX_MAGIC,
+    MAILBOX_IDLE,
+    0,
+    {0}
+};
 
 // ------------------------------------------------------------------------------
 // Security & System Settings
@@ -64,15 +87,6 @@ static const uint8_t MASTER_AES_KEY[16] = {
 
 static uint8_t g_password_length = DEFAULT_PASSWORD_LEN; // Default: 14 chars
 static bool g_oled_available = false;
-static bool g_usb_ready = false;
-
-void ensure_usb_ready(void) {
-    if (!g_usb_ready) {
-        Keyboard.begin();
-        g_usb_ready = true;
-        delay(350);
-    }
-}
 
 // Instantiate Rotary Encoder driver
 RotaryEncoder encoder(PIN_ENCODER_CLK, PIN_ENCODER_DT, PIN_ENCODER_SW);
@@ -324,6 +338,59 @@ void render_error_card(const char *title, const char *line1, const char *line2) 
 }
 
 // ------------------------------------------------------------------------------
+// ST-Link SWD Mailbox Transmitter
+// ------------------------------------------------------------------------------
+/**
+ * @brief Sends password to PC host via ST-Link SWD shared memory mailbox.
+ *        The host companion daemon (keypill_daemon.py) reads the mailbox and types
+ *        the password into the focused window using xdotool.
+ */
+bool send_password_via_swd_mailbox(const char *action_title, const char *pwd, size_t len) {
+    if (!pwd || len == 0 || len >= sizeof(g_mailbox.password)) return false;
+
+    // 1. Prepare mailbox payload
+    g_mailbox.length = (uint32_t)len;
+    for (size_t i = 0; i < len; ++i) {
+        g_mailbox.password[i] = pwd[i];
+    }
+    g_mailbox.password[len] = '\0';
+    g_mailbox.magic = MAILBOX_MAGIC;
+    g_mailbox.status = MAILBOX_PENDING_TYPE; // Signal daemon to type
+
+    // 2. Wait for PC companion daemon to type password and acknowledge
+    render_action_card(action_title, "3/3 Typing via ST-Link", 75);
+    uint32_t start_ms = millis();
+    bool typed = false;
+
+    while (millis() - start_ms < 4000) { // 4.0 second timeout
+        // Pulse Green LED while waiting for daemon acknowledgment
+        digitalWrite(PIN_LED_GREEN, ((millis() / 150) % 2 == 0) ? HIGH : LOW);
+        digitalWrite(PIN_LED_RED, LOW);
+
+        if (g_mailbox.status == MAILBOX_TYPED_OK) {
+            typed = true;
+            break;
+        }
+        delay(15);
+    }
+
+    // 3. IMMEDIATELY sanitize memory: zero out plaintext password in RAM
+    secure_zero_memory((void*)g_mailbox.password, sizeof(g_mailbox.password));
+    g_mailbox.status = MAILBOX_IDLE;
+    g_mailbox.length = 0;
+
+    if (!typed) {
+        // Daemon timed out / not running on laptop
+        blink_led(PIN_LED_RED, 3, 100);
+        render_error_card("DAEMON OFFLINE", "Run on laptop:", "python3 keypill_daemon.py");
+        delay(2500);
+        return false;
+    }
+
+    return true;
+}
+
+// ------------------------------------------------------------------------------
 // Multi-Slot Browser UI (Vertical Overview List of 10 Slots)
 // ------------------------------------------------------------------------------
 int select_slot_browser(const char *action_title, bool allow_clear) {
@@ -521,19 +588,12 @@ void execute_auto_fill_new() {
     record.encrypted_len = (uint8_t)encrypted_bytes;
     storage_save_slot((uint8_t)slot, &record);
 
-    // USB HID typing with pulsing Green LED
-    ensure_usb_ready();
-    delay(100);
-
-    for (size_t i = 0; i < pass_len; ++i) {
-        digitalWrite(PIN_LED_GREEN, (i % 2 == 0) ? HIGH : LOW);
-        digitalWrite(PIN_LED_RED, LOW);
-        Keyboard.write((uint8_t)plaintext_pass[i]);
-        uint8_t pct = 60 + (uint8_t)(((i + 1) * 40) / pass_len);
-        render_action_card("AUTO-FILL NEW", "3/3 USB Typing...", pct);
-        delay(35);
+    // Transmit password to PC via ST-Link SWD Mailbox
+    if (!send_password_via_swd_mailbox("AUTO-FILL NEW", plaintext_pass, pass_len)) {
+        secure_zero_memory(plaintext_pass, sizeof(plaintext_pass));
+        secure_zero_memory(&record, sizeof(record));
+        return;
     }
-    Keyboard.write(KEY_RETURN);
 
     secure_zero_memory(plaintext_pass, sizeof(plaintext_pass));
     secure_zero_memory(&record, sizeof(record));
@@ -551,7 +611,7 @@ void execute_auto_fill_saved() {
         return;
     }
 
-    int slot = select_slot_browser("AUTO-FILL USB", true);
+    int slot = select_slot_browser("AUTO-FILL", true);
     if (slot < 0) return;
 
     if (!storage_is_slot_occupied((uint8_t)slot)) {
@@ -597,18 +657,12 @@ void execute_auto_fill_saved() {
         return;
     }
 
-    ensure_usb_ready();
-    delay(100);
-
-    for (size_t i = 0; i < dec_len; ++i) {
-        digitalWrite(PIN_LED_GREEN, (i % 2 == 0) ? HIGH : LOW);
-        digitalWrite(PIN_LED_RED, LOW);
-        Keyboard.write((uint8_t)plaintext_pass[i]);
-        uint8_t pct = 60 + (uint8_t)(((i + 1) * 40) / dec_len);
-        render_action_card("AUTO-FILL SAVED", "3/3 USB Typing...", pct);
-        delay(35);
+    // Transmit password to PC via ST-Link SWD Mailbox
+    if (!send_password_via_swd_mailbox("AUTO-FILL SAVED", plaintext_pass, dec_len)) {
+        secure_zero_memory(plaintext_pass, sizeof(plaintext_pass));
+        secure_zero_memory(&record, sizeof(record));
+        return;
     }
-    Keyboard.write(KEY_RETURN);
 
     secure_zero_memory(plaintext_pass, sizeof(plaintext_pass));
     secure_zero_memory(&record, sizeof(record));
@@ -617,7 +671,7 @@ void execute_auto_fill_saved() {
     snprintf(slot_label, sizeof(slot_label), "Slot %02d Auto-Filled!", slot + 1);
 
     set_leds(true, false); // Green LED Solid: Success
-    render_success_card("AUTO-FILL COMPLETE!", slot_label, "Submitted to PC");
+    render_success_card("AUTO-FILL COMPLETE!", slot_label, "Transferred to PC");
     delay(1500);
 }
 
@@ -824,9 +878,9 @@ void execute_sys_info() {
     OLED.setCursor(10, 19);
     OLED.print("MCU: STM32F103 @72MHz");
     OLED.setCursor(10, 28);
-    OLED.print("Core: ARM Cortex-M3");
-    OLED.setCursor(10, 37);
     OLED.print("Crypto: AES-128 NIST");
+    OLED.setCursor(10, 37);
+    OLED.print("Link: ST-Link SWD");
 
     // Footer
     OLED.drawLine(4, 51, 123, 51, 1);
@@ -855,27 +909,34 @@ void setup() {
     pinMode(PIN_STATUS_LED, OUTPUT);
     pinMode(PIN_ENTROPY_ADC, INPUT_ANALOG);
 
-    // Hardware Power-on Self-Test: flash all LEDs for 500ms so user verifies LEDs and power
+    // Hardware Power-on Self-Test: flash all LEDs for 200ms
     digitalWrite(PIN_LED_GREEN, HIGH);
     digitalWrite(PIN_LED_RED, HIGH);
     digitalWrite(PIN_STATUS_LED, LOW); // Onboard PC13 active LOW (ON)
-    delay(500);
+    delay(200);
     set_leds(false, false);
-    delay(150);
+    delay(100);
     set_leds(true, false); // Green LED ON = Ready!
 
-    // Storage and Rotary Encoder initialization
+    // 1. Storage and Rotary Encoder initialization
     storage_init();
     encoder.begin();
 
-    // OLED Display initialization over I2C (PB6 = SCL, PB7 = SDA)
+    // 2. Initialize SWD Mailbox
+    g_mailbox.magic = MAILBOX_MAGIC;
+    g_mailbox.status = MAILBOX_IDLE;
+    g_mailbox.length = 0;
+    secure_zero_memory((void*)g_mailbox.password, sizeof(g_mailbox.password));
+
+    // 3. OLED Display initialization over I2C (PB6 = SCL, PB7 = SDA)
     g_oled_available = OLED.begin(OLED_I2C_ADDR);
     if (!g_oled_available) {
         // Fallback for OLED modules wired at 0x3D
         g_oled_available = OLED.begin(0x3D);
     }
 
-    // Welcome Splash Screen on OLED with KeyPill Branding & Double Border (4s duration)
+    // 4. Welcome Splash Screen on OLED with KeyPill Branding
+    // (USB enumeration occurs concurrently in the background via interrupts)
     if (g_oled_available) {
         for (uint8_t p = 0; p <= 100; p += 5) {
             OLED.clear();
@@ -903,9 +964,9 @@ void setup() {
             // Animated Boot Progress Bar
             OLED.drawProgressBar(14, 52, 100, 6, p);
             OLED.display();
-            delay(90); // 21 steps * 90ms = ~1.9 seconds smooth fill
+            delay(40); // 21 steps * 40ms = ~840ms smooth fill
         }
-        delay(2100);   // Hold completed screen for 2.1s -> Total boot time = 4.0 seconds
+        delay(400);   // Brief hold -> Total boot time = ~1.2 seconds
     }
 
     g_card_selected_time = millis();
@@ -915,9 +976,11 @@ void setup() {
 void loop() {
     // Active heartbeat: toggle onboard PC13 LED every 500ms so user knows loop is running
     static uint32_t last_heartbeat = 0;
+    static bool s_heartbeat = false;
     if (millis() - last_heartbeat >= 500) {
         last_heartbeat = millis();
-        digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED));
+        s_heartbeat = !s_heartbeat;
+        digitalWrite(PIN_STATUS_LED, s_heartbeat ? LOW : HIGH);
     }
 
     // Read Rotary Encoder knob movements
