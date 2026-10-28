@@ -49,9 +49,17 @@ int storage_save_slot(uint8_t slot, const struct PasswordRecord *record) {
     const uint8_t *ptr = (const uint8_t *)&rec_to_save;
 
 #if defined(ARDUINO)
+    #if !defined(DATA_EEPROM_BASE)
+    eeprom_buffer_fill();
+    for (size_t i = 0; i < sizeof(struct PasswordRecord); ++i) {
+        eeprom_buffered_write_byte(base_addr + i, ptr[i]);
+    }
+    eeprom_buffer_flush();
+    #else
     for (size_t i = 0; i < sizeof(struct PasswordRecord); ++i) {
         EEPROM.write(base_addr + i, ptr[i]);
     }
+    #endif
     return 1;
 #else
     memcpy(&mock_eeprom[base_addr], ptr, sizeof(struct PasswordRecord));
@@ -94,9 +102,17 @@ int storage_clear_slot(uint8_t slot) {
     uint16_t base_addr = (uint16_t)slot * sizeof(struct PasswordRecord);
 
 #if defined(ARDUINO)
+    #if !defined(DATA_EEPROM_BASE)
+    eeprom_buffer_fill();
+    for (size_t i = 0; i < sizeof(struct PasswordRecord); ++i) {
+        eeprom_buffered_write_byte(base_addr + i, 0xFF);
+    }
+    eeprom_buffer_flush();
+    #else
     for (size_t i = 0; i < sizeof(struct PasswordRecord); ++i) {
         EEPROM.write(base_addr + i, 0xFF);
     }
+    #endif
     return 1;
 #else
     memset(&mock_eeprom[base_addr], 0xFF, sizeof(struct PasswordRecord));
