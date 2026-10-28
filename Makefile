@@ -12,7 +12,12 @@ $(TARGET): $(SRC)
 test: $(TARGET)
 	./$(TARGET)
 
+web:
+	./start_web.sh
+
+serve: web
+
 clean:
 	rm -f $(TARGET)
 
-.PHONY: all test clean
+.PHONY: all test web serve clean
