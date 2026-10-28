@@ -1,3 +1,0 @@
-[submodule "tools/pystlink"]
-	path = tools/pystlink
-	url = https://github.com/pavelrevak/pystlink.git
