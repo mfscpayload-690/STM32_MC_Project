@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=KeyPill Companion
+Comment=Hardware Password Auto-Filler via ST-Link SWD
+Exec=/home/mfscpayload-690/Desktop/STM32-bluepill/start_keypill.sh
+Terminal=true
+Type=Application
+Categories=Utility;Security;
+Icon=dialog-password
